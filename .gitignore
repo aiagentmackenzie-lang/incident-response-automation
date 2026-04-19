@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Runtime output — NEVER push audit logs
+security-events.log
+
+# OS/editor junk
+.DS_Store
+*.swp
+*.swo
+
+# Environment secrets
+.env
+.env.*
+
+# Test coverage
+coverage/

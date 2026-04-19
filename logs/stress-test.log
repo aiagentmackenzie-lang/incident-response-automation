@@ -1,0 +1,62 @@
+# Realistic mixed log file with multiple attack patterns
+# Lines with comments, blanks, weird formatting, multiple IPs, mixed events
+
+192.168.1.1 - failed login - 2026-04-19T08:00:00Z
+192.168.1.1 - failed login - 2026-04-19T08:00:01Z
+192.168.1.1 - failed login - 2026-04-19T08:00:02Z
+192.168.1.1 - failed login - 2026-04-19T08:00:03Z
+192.168.1.1 - failed login - 2026-04-19T08:00:04Z
+
+# Attacker switches IP mid-burst
+192.168.1.100 - failed login - 2026-04-19T08:00:05Z
+192.168.1.100 - failed login - 2026-04-19T08:00:06Z
+192.168.1.100 - failed login - 2026-04-19T08:00:07Z
+
+# Legit user
+10.0.0.5 - successful login - 2026-04-19T08:00:08Z
+10.0.0.5 - page view - 2026-04-19T08:00:09Z
+
+# Continue brute force from first IP (still under threshold)
+192.168.1.1 - failed login - 2026-04-19T08:00:10Z
+192.168.1.1 - failed login - 2026-04-19T08:00:11Z
+192.168.1.1 - failed login - 2026-04-19T08:00:12Z
+192.168.1.1 - failed login - 2026-04-19T08:00:13Z
+192.168.1.1 - failed login - 2026-04-19T08:00:14Z
+
+# Now reach threshold
+192.168.1.1 - failed login - 2026-04-19T08:00:15Z
+192.168.1.1 - failed login - 2026-04-19T08:00:16Z
+192.168.1.1 - failed login - 2026-04-19T08:00:17Z
+192.168.1.1 - failed login - 2026-04-19T08:00:18Z
+192.168.1.1 - failed login - 2026-04-19T08:00:19Z
+
+# Second IP continues its brute force
+192.168.1.100 - failed login - 2026-04-19T08:00:20Z
+192.168.1.100 - failed login - 2026-04-19T08:00:21Z
+192.168.1.100 - failed login - 2026-04-19T08:00:22Z
+192.168.1.100 - failed login - 2026-04-19T08:00:23Z
+192.168.1.100 - failed login - 2026-04-19T08:00:24Z
+192.168.1.100 - failed login - 2026-04-19T08:00:25Z
+192.168.1.100 - failed login - 2026-04-19T08:00:26Z
+
+# Some garbage lines the parser should reject
+GARBAGE LINE NO FORMAT
+
+# Weird spacing
+  192.168.1.200   -   failed login   -   2026-04-19T08:00:30Z  
+
+# Another attacker — fast burst
+172.16.0.1 - failed login - 2026-04-19T08:01:00Z
+172.16.0.1 - failed login - 2026-04-19T08:01:01Z
+172.16.0.1 - failed login - 2026-04-19T08:01:02Z
+172.16.0.1 - failed login - 2026-04-19T08:01:03Z
+172.16.0.1 - failed login - 2026-04-19T08:01:04Z
+172.16.0.1 - failed login - 2026-04-19T08:01:05Z
+172.16.0.1 - failed login - 2026-04-19T08:01:06Z
+172.16.0.1 - failed login - 2026-04-19T08:01:07Z
+172.16.0.1 - failed login - 2026-04-19T08:01:08Z
+172.16.0.1 - failed login - 2026-04-19T08:01:09Z
+
+# Events outside the time window (2 min later) — should start fresh count
+192.168.1.1 - failed login - 2026-04-19T08:03:00Z
+192.168.1.1 - failed login - 2026-04-19T08:03:01Z

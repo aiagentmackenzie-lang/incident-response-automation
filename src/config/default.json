@@ -1,0 +1,16 @@
+{
+  "logFormat": "text",
+  "timeWindowSeconds": 60,
+  "bruteForceThreshold": 10,
+  "spikeThreshold": 100,
+  "ai": {
+    "enabled": false,
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "model": "your-model-id",
+    "apiKeyEnvVar": "OPENROUTER_API_KEY"
+  },
+  "response": {
+    "simulate": true,
+    "webhookUrl": null
+  }
+}
