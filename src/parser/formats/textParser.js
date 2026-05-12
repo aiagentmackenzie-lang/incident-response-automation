@@ -2,8 +2,9 @@
 'use strict';
 
 /**
- * Parse a text log line
+ * Parse a text log line.
  * Format: "192.168.1.1 - failed login - 2026-03-29T12:34:56Z"
+ * Supports events containing " - " by joining middle segments.
  * @param {string} line
  * @returns {Object|null}
  */
@@ -13,13 +14,16 @@ function parseTextLine(line) {
     return null;
   }
 
-  const [ip, event, ts] = parts;
-  const timestamp = new Date(ts.trim());
+  const ip = parts[0].trim();
+  const ts = parts[parts.length - 1].trim();
+  const event = parts.slice(1, -1).join(' - ').trim();
+
+  const timestamp = new Date(ts);
   if (Number.isNaN(timestamp.getTime())) return null;
 
   return {
-    ip: ip.trim(),
-    event: event.trim(),
+    ip,
+    event,
     timestamp,
     raw: line
   };

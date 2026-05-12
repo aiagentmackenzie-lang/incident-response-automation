@@ -34,6 +34,19 @@ describe('Text Parser', () => {
     const line = '10.0.0.1 - page view - 2026-04-19T08:00:00Z';
     expect(parseTextLine(line).raw).toBe(line);
   });
+
+  test('handles multi-segment events (event contains " - ")', () => {
+    const result = parseTextLine('10.0.0.1 - admin logout - failed login - 2026-03-29T12:00:00Z');
+    expect(result).not.toBeNull();
+    expect(result.ip).toBe('10.0.0.1');
+    expect(result.event).toBe('admin logout - failed login');
+    expect(result.timestamp).toBeInstanceOf(Date);
+  });
+
+  test('handles event with single middle segment', () => {
+    const result = parseTextLine('10.0.0.1 - failed login - 2026-03-29T12:00:00Z');
+    expect(result.event).toBe('failed login');
+  });
 });
 
 describe('JSON Parser', () => {

@@ -2,14 +2,45 @@
 'use strict';
 
 const fetch = require('node-fetch');
+const path = require('path');
+const fs = require('fs');
 
-const AI_ENABLED = process.env.AI_ENABLED === 'true';
-const AI_ENDPOINT = process.env.AI_ENDPOINT;
-const AI_MODEL = process.env.AI_MODEL;
-const AI_API_KEY = process.env.AI_API_KEY;
+/**
+ * Classification configuration sources (priority: env var > local.json > default.json):
+ *   AI_ENABLED     – 'true' to enable
+ *   AI_ENDPOINT    – LLM API endpoint
+ *   AI_MODEL       – model identifier
+ *   AI_API_KEY     – API key (or use apiKeyEnvVar in config to name a different env var)
+ *
+ *   Config file keys under "ai":
+ *     enabled, endpoint, model, apiKeyEnvVar
+ */
+
+// Load config (local.json overrides default.json)
+let fileConfig = {};
+try {
+  fileConfig = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../config/local.json'), 'utf8'));
+} catch {
+  try {
+    fileConfig = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../config/default.json'), 'utf8'));
+  } catch { /* no config file available */ }
+}
+
+function resolveConfig() {
+  const ai = fileConfig.ai || {};
+  const enabled = process.env.AI_ENABLED === 'true' || ai.enabled === true;
+  const endpoint = process.env.AI_ENDPOINT || ai.endpoint || null;
+  const model = process.env.AI_MODEL || ai.model || null;
+  // If apiKeyEnvVar is set in config, read the key from that env var name; otherwise fall back to AI_API_KEY
+  const apiKeyEnvName = ai.apiKeyEnvVar || 'AI_API_KEY';
+  const apiKey = process.env[apiKeyEnvName] || process.env.AI_API_KEY || null;
+  return { enabled, endpoint, model, apiKey };
+}
 
 async function classifyIncident(threat) {
-  if (!AI_ENABLED || !AI_ENDPOINT || !AI_MODEL || !AI_API_KEY) {
+  const { enabled, endpoint, model, apiKey } = resolveConfig();
+
+  if (!enabled || !endpoint || !model || !apiKey) {
     return {
       enabled: false,
       severity: 'MEDIUM',
@@ -18,7 +49,7 @@ async function classifyIncident(threat) {
   }
 
   const body = {
-    model: AI_MODEL,
+    model,
     messages: [
       {
         role: 'system',
@@ -32,11 +63,11 @@ async function classifyIncident(threat) {
     ]
   };
 
-  const res = await fetch(AI_ENDPOINT, {
+  const res = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${AI_API_KEY}`
+      Authorization: `Bearer ${apiKey}`
     },
     body: JSON.stringify(body)
   });

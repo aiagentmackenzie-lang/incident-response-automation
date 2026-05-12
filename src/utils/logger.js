@@ -10,7 +10,11 @@ const securityLogger = createLogger({
   level: 'info',
   format: format.combine(format.timestamp(), format.json()),
   transports: [
-    new transports.File({ filename: LOG_FILE })
+    new transports.File({
+      filename: LOG_FILE,
+      maxsize: 10_485_760, // 10 MB
+      maxFiles: 5
+    })
   ],
   // Console transport added only when explicitly requested
 });

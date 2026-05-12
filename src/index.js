@@ -2,7 +2,7 @@
 'use strict';
 
 const { buildParser } = require('./parser/logParser');
-const { detectAll } = require('./detection/rules');
+const { createDetector } = require('./detection/rules');
 const { TimeWindowCounter } = require('./detection/stateStore');
 const { respondToThreat } = require('./response/actions');
 const { classifyIncident } = require('./ai/classifier');
@@ -12,8 +12,9 @@ const { securityLogger } = require('./utils/logger');
 module.exports = {
   // Parser
   buildParser,
-  // Detection
-  detectAll,
+  // Detection (use createDetector() for fresh state — no singleton)
+  createDetector,
+  // State
   TimeWindowCounter,
   // Response
   respondToThreat,

@@ -11,12 +11,17 @@ const { respondToThreat } = require('../response/actions');
 const { reportIncident, reportScanSummary } = require('../utils/reporter');
 const { classifyIncident } = require('../ai/classifier');
 
-// Load config if available
+// Load config — local.json overrides default.json, with env vars as final overrides
 let config = {};
 try {
-  const configPath = path.resolve(__dirname, '../config/default.json');
-  config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-} catch { /* use defaults */ }
+  try {
+    config = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../config/local.json'), 'utf8'));
+  } catch {
+    config = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../config/default.json'), 'utf8'));
+  }
+} catch (err) {
+  console.warn(`[WARN] Failed to load config, using defaults: ${err.message}`);
+}
 
 async function processLine(line, parse, detector, jsonMode, stats) {
   const log = parse(line);
@@ -128,11 +133,14 @@ async function main() {
 
   const format = process.env.LOG_FORMAT || config.logFormat || 'text';
   const parse = buildParser(format);
-  const threshold = config.bruteForceThreshold || 10;
+  const bruteForceThreshold = parseInt(config.bruteForceThreshold, 10) || 10;
+  const spikeThreshold = parseInt(config.spikeThreshold, 10) || 100;
+  const timeWindowSeconds = parseInt(config.timeWindowSeconds, 10) || 60;
 
   const detector = createDetector({
-    timeWindowMs: (config.timeWindowSeconds || 60) * 1000,
-    bruteForceThreshold: threshold
+    timeWindowMs: timeWindowSeconds * 1000,
+    bruteForceThreshold,
+    spikeThreshold
   });
 
   const stats = {
@@ -147,7 +155,7 @@ async function main() {
     console.log(`═══════════════════════════════════════`);
     console.log(`  INCIDENT RESPONSE AUTOMATION TOOL`);
     console.log(`  File: ${file}`);
-    console.log(`  Format: ${format} | Threshold: ${threshold} | Window: ${config.timeWindowSeconds || 60}s`);
+    console.log(`  Format: ${format} | Threshold: ${bruteForceThreshold} | Window: ${timeWindowSeconds}s`);
     console.log(`═══════════════════════════════════════`);
   }
 
@@ -159,7 +167,7 @@ async function main() {
     if (jsonMode) {
       console.log(JSON.stringify({ summary: true, incidents: stats.incidents, parsed: stats.parsed, rejected: stats.rejected }));
     } else {
-      reportScanSummary({ ...stats, threshold });
+      reportScanSummary({ ...stats, threshold: bruteForceThreshold });
     }
   }
 }

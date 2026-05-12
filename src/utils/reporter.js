@@ -18,12 +18,18 @@ function reportIncident(threat, classification) {
 
   console.log('');
   console.log('╔══════════════════════════════════════╗');
-  console.log('║       🚨 INCIDENT DETECTED          ║');
+  console.log('║       INCIDENT DETECTED              ║');
   console.log('╠══════════════════════════════════════╣');
   console.log(`║  Type:     ${pad(threat.type, 25)}║`);
   console.log(`║  IP:       ${pad(threat.ip, 25)}║`);
   console.log(`║  Count:    ${pad(String(threat.count ?? 'n/a'), 25)}║`);
   console.log(`║  Time:     ${pad(threat.timestamp?.toISOString?.() ?? 'n/a', 25)}║`);
+  if (threat.reason) {
+    console.log(`║  Reason:   ${pad(threat.reason, 25)}║`);
+  }
+  if (threat.pattern) {
+    console.log(`║  Pattern:  ${pad(threat.pattern, 25)}║`);
+  }
   if (classification) {
     console.log('╠══════════════════════════════════════╣');
     console.log(`║  Severity: ${pad(classification.severity, 25)}║`);
@@ -54,7 +60,7 @@ function reportScanSummary(stats) {
     for (const [ip, data] of sorted) {
       const failed = typeof data === 'object' ? (data.failed || 0) : data;
       const other = typeof data === 'object' ? (data.other || 0) : 0;
-      const flag = failed >= (stats.threshold || 10) ? ' 🔴 ALERT' : '';
+      const flag = failed >= (stats.threshold || 10) ? ' ALERT' : '';
       const extra = other > 0 ? ` + ${other} other` : '';
       console.log(`    ${ip}: ${failed} failed logins${extra}${flag}`);
     }

@@ -3,7 +3,9 @@
 
 const { securityLogger } = require('../utils/logger');
 
-const SIMULATE = process.env.SIMULATE_RESPONSE !== 'false';
+function isSimulate() {
+  return process.env.SIMULATE_RESPONSE !== 'false';
+}
 
 function logAction(action, payload) {
   securityLogger.info({
@@ -14,14 +16,15 @@ function logAction(action, payload) {
 }
 
 async function blockIP(ip, jsonMode) {
-  logAction('block_ip', { ip, simulate: SIMULATE });
+  const simulate = isSimulate();
+  logAction('block_ip', { ip, simulate });
 
   if (jsonMode) {
     // JSON mode: no console output, action logged to file only
     return;
   }
 
-  if (SIMULATE) {
+  if (simulate) {
     console.log(`  ⛔ [SIMULATE] Would block IP: ${ip}`);
   } else {
     console.log(`  🔴 [ACTION] Blocking IP: ${ip}`);
@@ -33,7 +36,13 @@ async function respondToThreat(threat, jsonMode = false) {
 
   switch (threat.type) {
     case 'BruteForceLogin':
+    case 'SuspiciousIP':
+    case 'EventSpike':
       await blockIP(threat.ip, jsonMode);
+      break;
+    case 'UnauthorizedAccess':
+      await blockIP(threat.ip, jsonMode);
+      logAction('unauthorized_access_alert', { ip: threat.ip, pattern: threat.pattern, event: threat.event });
       break;
     default:
       logAction('no_playbook', { threat });
