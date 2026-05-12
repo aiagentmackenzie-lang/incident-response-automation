@@ -45,9 +45,10 @@ This tool demonstrates SOC-style thinking: detection, enrichment, containment, a
   - Stateful tracking per principal (IP, user, API key).
 
 - **Classification layer (AI-assisted, optional)**
-  - Severity scoring and confidence.
+  - Severity scoring (HIGH/MEDIUM).
   - Recommendations for containment.
-  - Explanation of reasoning to support analyst review (no silent auto-block without logs).
+  - Works with any OpenAI-compatible API (OpenRouter, local LLMs, etc.).
+  - Configurable via `default.json`, `local.json`, or environment variables.
 
 - **Response engine**
   - Simulated or real IP blocking (e.g., iptables, cloud firewall APIs).
@@ -78,7 +79,7 @@ Baseline rules are intentionally opinionated, mapping directly to classic SOC pl
   - Repeated 403/401 errors to sensitive endpoints.
   - Access attempts to decommissioned APIs or honeypot paths.
 
-Each rule is implemented as a pure function that consumes normalized log events and emits either `null` or a `DetectionEvent` structure.
+Each rule is implemented as a pure function inside `createDetector()` and emits either `null` or a `DetectionEvent` structure. Create separate detector instances to avoid state contamination between tests.
 
 ## 🏗️ High-Level Architecture
 
@@ -147,9 +148,15 @@ incident-response/
 │   │   └── index.js
 │   └── index.js
 ├── test/
-│   └── detection.test.js
+│   ├── detection.test.js
+│   ├── parser.test.js
+│   ├── classifier.test.js
+│   └── response.test.js
 ├── logs/
-│   └── sample-auth.log
+│   ├── sample-auth.log
+│   ├── sample-auth.json
+│   ├── stress-test.log
+│   └── e2e-test.log
 ├── package.json
 └── README.md
 ```
@@ -197,6 +204,26 @@ Example `src/config/default.json`:
 }
 ```
 
+Copy to `local.json` to override defaults without editing version-controlled config:
+
+```bash
+cp src/config/default.json src/config/local.json
+```
+
+Configuration priority: **environment variables > `local.json` > `default.json`**.
+
+| Env Var | Config Key | Default | Description |
+|---------|-----------|---------|-------------|
+| `LOG_FORMAT` | `logFormat` | `text` | Parser format (`text` or `json`) |
+| `TIME_WINDOW_SECONDS` | `timeWindowSeconds` | `60` | Sliding window for detection (seconds) |
+| `BRUTE_FORCE_THRESHOLD` | `bruteForceThreshold` | `10` | Failed logins to trigger BruteForceLogin |
+| `SPIKE_THRESHOLD` | `spikeThreshold` | `100` | Events per IP to trigger EventSpike |
+| `AI_ENABLED` | `ai.enabled` | `false` | Enable AI classification |
+| `AI_ENDPOINT` | `ai.endpoint` | — | LLM API endpoint URL |
+| `AI_MODEL` | `ai.model` | — | Model identifier |
+| `OPENROUTER_API_KEY` | `ai.apiKeyEnvVar` | — | API key (env var name configurable) |
+| `SIMULATE_RESPONSE` | — | `true` | Set to `false` to enable real actions |
+
 Never hard-code secrets (API keys, webhook URLs); load them via environment variables or a secrets manager.
 
 ## 🧪 Example Usage
@@ -235,26 +262,39 @@ const event = parse('192.168.1.1 - failed login - 2026-03-29T12:34:56Z');
 
 ### 2. Detection Engine
 
-Sliding window counter for brute force detection:
+Four built-in rules, each with its own stateful tracker:
+
+| Rule | Trigger |
+|------|---------|
+| `BruteForceLogin` | N failed logins from same IP within time window |
+| `EventSpike` | N total events from same IP within time window |
+| `SuspiciousIP` | Access from private/loopback/link-local ranges (alert-once per IP) |
+| `UnauthorizedAccess` | 401/403 to sensitive endpoints (`/admin`, `.env`, `wp-login`, etc.) |
 
 ```javascript
-const { detectAll } = require('./src/detection/rules');
+const { createDetector } = require('./src/detection/rules');
+
+const detector = createDetector({ bruteForceThreshold: 10, spikeThreshold: 100 });
 
 // After 10 failed logins from same IP within 60 seconds
-detectAll({ ip: '10.0.0.1', event: 'failed login', timestamp: new Date() });
-// → { type: 'BruteForceLogin', ip: '10.0.0.1', count: 10, ... }
+detector.detectAll({ ip: '203.0.113.5', event: 'failed login', timestamp: new Date() });
+// → { type: 'BruteForceLogin', ip: '203.0.113.5', count: 10, ... }
 ```
+
+Always use `createDetector()` to get a fresh instance with isolated state. This avoids cross-test contamination and makes the detection engine safe for concurrent use.
 
 ### 3. Response Actions
 
-Simulated or real blocking:
+Simulated or real blocking, checked at call time (not module load):
 
 ```javascript
 const { respondToThreat } = require('./src/response/actions');
 
 // SIMULATE_RESPONSE=true (default)
-await respondToThreat({ type: 'BruteForceLogin', ip: '10.0.0.1' });
-// → [SIMULATE] Would block IP: 10.0.0.1
+await respondToThreat({ type: 'BruteForceLogin', ip: '203.0.113.5' });
+// → [SIMULATE] Would block IP: 203.0.113.5
+
+// Supported threat types: BruteForceLogin, SuspiciousIP, EventSpike, UnauthorizedAccess
 ```
 
 ### 4. AI Classification (Optional)
@@ -274,13 +314,18 @@ const classification = await classifyIncident(threat);
 ```text
 [INFO] incident_detected {"type":"BruteForceLogin","ip":"192.168.1.10", ...}
 
-=== INCIDENT DETECTED ===
-Type: BruteForceLogin
-IP: 192.168.1.10
-Count: 25
-Severity: MEDIUM
-Advice: Multiple failed logins from a single IP within 60 seconds. Block IP and investigate associated accounts.
-[SIMULATE] Would block IP: 192.168.1.10
+╔══════════════════════════════════════╗
+║       INCIDENT DETECTED              ║
+╠══════════════════════════════════════╣
+║  Type:     BruteForceLogin          ║
+║  IP:       203.0.113.10             ║
+║  Count:    25                       ║
+║  Time:     2026-05-12T20:00:00.000Z  ║
+╠══════════════════════════════════════╣
+║  Severity: MEDIUM                   ║
+║  Advice:   Review incident manuall..║
+╚══════════════════════════════════════╝
+  ⛔ [SIMULATE] Would block IP: 203.0.113.10
 ```
 
 ## 🔒 Security & Privacy Considerations
@@ -304,20 +349,22 @@ npm test -- --coverage
 Example test:
 
 ```javascript
-const { detectAll } = require('../src/detection/rules');
+const { createDetector } = require('../src/detection/rules');
 
+// Use public IPs (RFC 5737 TEST-NET) to avoid triggering SuspiciousIP rule
 function buildLog(ip, event, ts) {
   return { ip, event, timestamp: ts ? new Date(ts) : new Date() };
 }
 
 test('detects brute force after threshold', () => {
-  const ip = '10.0.0.1';
+  const detector = createDetector({ bruteForceThreshold: 10 });
+  const ip = '203.0.113.1';
   let threat = null;
   for (let i = 0; i < 9; i++) {
-    threat = detectAll(buildLog(ip, 'failed login'));
+    threat = detector.detectAll(buildLog(ip, 'failed login'));
     expect(threat).toBeNull();
   }
-  threat = detectAll(buildLog(ip, 'failed login'));
+  threat = detector.detectAll(buildLog(ip, 'failed login'));
   expect(threat).not.toBeNull();
   expect(threat.type).toBe('BruteForceLogin');
 });
@@ -339,9 +386,10 @@ Next steps to turn this into a flagship portfolio project:
    - Build a small web UI showing active incidents and timelines.
 
 4. **Additional playbooks**
-   - Suspicious admin activity.
+   - ~~Suspicious admin activity.~~ → Now implemented as `UnauthorizedAccess`
    - API key abuse detection.
    - RDP/SSH brute force from network perimeter logs.
+   - Geo-anomaly detection (impossible travel).
 
 5. **Hardening & deployment**
    - Containerize with a minimal base image.
