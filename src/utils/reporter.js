@@ -69,7 +69,7 @@ function reportScanSummary(stats) {
 }
 
 function pad(str, len) {
-  const s = String(str);
+  const s = String(str ?? 'n/a');
   return s.length >= len ? s.slice(0, len) : s + ' '.repeat(len - s.length);
 }
 

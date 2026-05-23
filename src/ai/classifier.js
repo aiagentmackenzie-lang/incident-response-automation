@@ -69,14 +69,22 @@ async function classifyIncident(threat) {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    timeout: 15000
+  }).catch((err) => {
+    return {
+      ok: false,
+      status: 0,
+      _error: err.message
+    };
   });
 
   if (!res.ok) {
+    const errorDetail = res._error || `HTTP ${res.status}`;
     return {
       enabled: true,
       severity: 'UNKNOWN',
-      recommendation: `AI error: ${res.status}`
+      recommendation: `AI error: ${errorDetail}`
     };
   }
 

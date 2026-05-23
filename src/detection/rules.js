@@ -7,27 +7,23 @@ const DEFAULT_WINDOW_MS = (parseInt(process.env.TIME_WINDOW_SECONDS, 10) || 60) 
 const DEFAULT_BRUTE_THRESHOLD = parseInt(process.env.BRUTE_FORCE_THRESHOLD, 10) || 10;
 const DEFAULT_SPIKE_THRESHOLD = parseInt(process.env.SPIKE_THRESHOLD, 10) || 100;
 
-// Known malicious / suspicious IP ranges (RFC 5737 test ranges + link-local + common scanner IPs)
+// Known malicious / suspicious IP ranges (loopback + private ranges appearing in external logs)
 const SUSPICIOUS_IPS = new Set([
   '0.0.0.0',
   '127.0.0.1'  // loopback appearing in external logs is suspicious
 ]);
-const SUSPICIOUS_RANGES = [
-  { network: '10.0.0.0', mask: '255.0.0.0' },   // private — unexpected in external logs
-  { network: '192.168.0.0', mask: '255.255.0.0' }, // private — unexpected from external
-  { network: '169.254.0.0', mask: '255.255.0.0' }   // link-local
-];
 
 // Endpoints considered sensitive for unauthorized access detection
+// Ordered from most specific to least specific (avoid greedy regex swallowing)
 const SENSITIVE_PATTERNS = [
-  /admin/i,
-  /wp-admin/i,
-  /\.env/i,
-  /wp-login/i,
   /phpmyadmin/i,
+  /actuator/i,
+  /wp-admin/i,
+  /wp-login/i,
+  /\.env/i,
+  /admin/i,
   /console/i,
-  /manager/i,
-  /actuator/i
+  /manager/i
 ];
 
 /**
@@ -138,7 +134,7 @@ function createDetector(opts = {}) {
    * Detect unauthorized access patterns (403/401 to sensitive endpoints).
    */
   function detectUnauthorizedAccess(log) {
-    if (!log || !log.event) return null;
+    if (!log || !log.ip || !log.event) return null;
     if (!log.timestamp || !(log.timestamp instanceof Date)) return null;
 
     // Check for failed auth status codes or failed login to sensitive paths

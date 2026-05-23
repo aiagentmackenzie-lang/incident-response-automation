@@ -208,6 +208,25 @@ describe('Detection Rules', () => {
       const threat = detector.detectAll(buildLog('203.0.113.5', 'failed login to /home'));
       expect(threat).toBeNull();
     });
+
+    test('does not crash on missing IP', () => {
+      const threat = detector.detectAll({ event: 'failed login to /admin', timestamp: new Date() });
+      expect(threat).toBeNull();
+    });
+
+    test('detects phpmyadmin access attempts', () => {
+      const threat = detector.detectAll(buildLog('203.0.113.5', 'GET /phpmyadmin/setup.php', new Date(), { status: 403 }));
+      expect(threat).not.toBeNull();
+      expect(threat.type).toBe('UnauthorizedAccess');
+      expect(threat.pattern).toBe('phpmyadmin');
+    });
+
+    test('detects spring actuator access', () => {
+      const threat = detector.detectAll(buildLog('203.0.113.5', 'GET /actuator/health', new Date(), { status: 403 }));
+      expect(threat).not.toBeNull();
+      expect(threat.type).toBe('UnauthorizedAccess');
+      expect(threat.pattern).toBe('actuator');
+    });
   });
 
   describe('Priority order', () => {

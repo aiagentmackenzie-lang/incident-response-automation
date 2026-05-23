@@ -79,6 +79,7 @@ function watchFile(file, parse, detector, jsonMode, stats) {
 
   if (!jsonMode) console.log(`[WATCH] Tailing ${file} from byte ${offset}... Press Ctrl+C to stop.`);
 
+  let leftover = '';
   const watcher = fs.watch(file, (eventType) => {
     if (eventType !== 'change') return;
 
@@ -91,7 +92,10 @@ function watchFile(file, parse, detector, jsonMode, stats) {
       tailStream.on('data', (chunk) => { data += chunk; });
       tailStream.on('end', () => {
         offset = stat.size;
-        const lines = data.split('\n');
+        const content = leftover + data;
+        const lines = content.split('\n');
+        // Last segment may be an incomplete line — save for next read
+        leftover = content.endsWith('\n') ? '' : lines.pop();
         for (const line of lines) {
           if (line.trim().length === 0) continue;
           stats.totalLines++;
@@ -105,7 +109,11 @@ function watchFile(file, parse, detector, jsonMode, stats) {
 
   const cleanup = () => {
     watcher.close();
-    if (!jsonMode) reportScanSummary({ ...stats, threshold: detector.threshold });
+    if (jsonMode) {
+      console.log(JSON.stringify({ summary: true, incidents: stats.incidents, parsed: stats.parsed, rejected: stats.rejected }));
+    } else {
+      reportScanSummary({ ...stats, threshold: detector.threshold });
+    }
     process.exit(0);
   };
   process.on('SIGINT', cleanup);
@@ -114,7 +122,7 @@ function watchFile(file, parse, detector, jsonMode, stats) {
 
 async function main() {
   const args = require('minimist')(process.argv.slice(2));
-  const file = args.file || args._[0];
+  const file = args.file || args.f || args._[0];
   const watch = Boolean(args.watch || args.w);
   const jsonMode = Boolean(args.json || args.j);
 

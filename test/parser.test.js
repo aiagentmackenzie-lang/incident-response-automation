@@ -63,6 +63,14 @@ describe('JSON Parser', () => {
     expect(result.user).toBe('admin');
   });
 
+  test('rejects invalid timestamp in JSON', () => {
+    expect(parseJsonLine('{"ip":"1.2.3.4","event":"test","timestamp":"not-a-date"}')).toBeNull();
+  });
+
+  test('rejects null event field', () => {
+    expect(parseJsonLine('{"ip":"1.2.3.4","event":null,"timestamp":"2026-01-01T00:00:00Z"}')).toBeNull();
+  });
+
   test('rejects missing required fields', () => {
     expect(parseJsonLine('{"ip":"1.2.3.4"}')).toBeNull();
     expect(parseJsonLine('{"ip":"1.2.3.4","event":"test"}')).toBeNull();

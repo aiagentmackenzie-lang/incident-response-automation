@@ -51,7 +51,7 @@ This tool demonstrates SOC-style thinking: detection, enrichment, containment, a
   - Configurable via `default.json`, `local.json`, or environment variables.
 
 - **Response engine**
-  - Simulated or real IP blocking (e.g., iptables, cloud firewall APIs).
+  - Simulated or real IP blocking (pluggable via firewall integration stub — extend for iptables, cloud APIs, WAF rules).
   - Local process kill and session flagging.
   - Webhook notifications (Slack, Teams, custom HTTP endpoint).
 
@@ -151,7 +151,8 @@ incident-response/
 │   ├── detection.test.js
 │   ├── parser.test.js
 │   ├── classifier.test.js
-│   └── response.test.js
+│   ├── response.test.js
+│   └── stateStore.test.js
 ├── logs/
 │   ├── sample-auth.log
 │   ├── sample-auth.json
@@ -222,7 +223,7 @@ Configuration priority: **environment variables > `local.json` > `default.json`*
 | `AI_ENDPOINT` | `ai.endpoint` | — | LLM API endpoint URL |
 | `AI_MODEL` | `ai.model` | — | Model identifier |
 | `OPENROUTER_API_KEY` | `ai.apiKeyEnvVar` | — | API key (env var name configurable) |
-| `SIMULATE_RESPONSE` | — | `true` | Set to `false` to enable real actions |
+| `SIMULATE_RESPONSE` | `response.simulate` | `true` | Set to `false` to enable real actions (env var overrides config file) |
 
 Never hard-code secrets (API keys, webhook URLs); load them via environment variables or a secrets manager.
 
@@ -231,19 +232,19 @@ Never hard-code secrets (API keys, webhook URLs); load them via environment vari
 ### Analyze a log file (batch)
 
 ```bash
-node src/cli/index.js --file logs/auth.log
+node src/cli/index.js --file logs/sample-auth.log
 ```
 
 ### Near real-time monitoring (tail mode)
 
 ```bash
-node src/cli/index.js --file logs/auth.log --watch
+node src/cli/index.js --file logs/sample-auth.log --watch
 ```
 
 ### JSON output (for piping into other tools)
 
 ```bash
-node src/cli/index.js --file logs/auth.log --json | jq
+node src/cli/index.js --file logs/sample-auth.log --json | jq
 ```
 
 ## 🧱 Core Components

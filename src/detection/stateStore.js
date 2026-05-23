@@ -18,7 +18,7 @@ class TimeWindowCounter {
   }
 
   reset(key) {
-    if (key) {
+    if (key !== undefined && key !== null) {
       this.map.delete(key);
     } else {
       this.map.clear();
